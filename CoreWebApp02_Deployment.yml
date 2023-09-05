@@ -1,0 +1,67 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- none
+
+variables:
+  IISWebAppName: 'CoreWebApp02IIS'
+  IISWebSiteName: 'Default Web Site'
+
+resources:
+ pipelines:
+   - pipeline: 'BuildPipeline'
+     project: 'ProjectOne'
+     source: 'CoreWebApp02'
+     branch: 'master'
+
+stages:
+  - stage: Stage_DeployWebApp
+    displayName: 'Stage - Deploy WebApp'
+    
+    jobs:
+      - deployment: Job_DeployWebApp
+        displayName: 'Job - Deploy WebApp'
+        environment: 'DeploymentEnv01.servervm01'
+        strategy:
+         runOnce:
+           deploy:
+             steps:
+               - checkout: none
+               
+               - download: 'BuildPipeline'
+                 name: 'DownloadBuildArtifacts'
+                 displayName: 'Download Build Artifacts'
+                 artifact: 'CoreWebApp02Drop'
+                 
+               - task: IISWebAppManagementOnMachineGroup@0
+                 name: 'StopIIS'
+                 displayName: 'Stop IIS'
+                 inputs:
+                   IISDeploymentType: 'IISWebsite'
+                   ActionIISWebsite: 'StopWebsite'
+                   StartStopWebsiteName: ${{variables.IISWebSiteName}}
+                
+               - task: IISWebAppManagementOnMachineGroup@0
+                 name: 'StopAppPool'
+                 displayName: 'Stop App Pool'
+                 inputs:
+                   IISDeploymentType: 'IISApplicationPool'
+                   ActionIISApplicationPool: 'RecycleAppPool'
+                   StartStopRecycleAppPoolName: 'DefaultAppPool'
+                  
+               - task: IISWebAppDeploymentOnMachineGroup@0
+                 inputs:
+                   WebSiteName: '${{ variables.IISWebSiteName }}'
+                   VirtualApplication: '${{ variables.IISWebAppName }}'
+                   Package: '$(Pipeline.Workspace)\BuildPipeline\CoreWebApp02Drop\CoreWebApp02'
+                
+               - task: IISWebAppManagementOnMachineGroup@0
+                 name: 'StartIIS'
+                 displayName: 'Start IIS'
+                 inputs:
+                   IISDeploymentType: 'IISWebsite'
+                   ActionIISWebsite: 'StartWebsite'
+                   StartStopWebsiteName: ${{variables.IISWebSiteName}}
